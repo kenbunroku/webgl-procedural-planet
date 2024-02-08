@@ -1,0 +1,22 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="Procedural Planet">
+  <main>
+    <canvas id="webgl-canvas"></canvas>
+  </main>
+
+  <script src="../scripts/script.js"></script>
+</Layout>
+
+<style>
+  main {
+    display: block;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+</style>
