@@ -1,5 +1,10 @@
+#version 300 es
 precision highp float;
 
+uniform float time;
+
+out vec4 fragColor;
+
 void main() {
-  gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+  fragColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 }
