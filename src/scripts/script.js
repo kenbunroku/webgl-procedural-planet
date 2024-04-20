@@ -1,9 +1,4 @@
-import {
-  loadFile,
-  createProgram,
-  createVbo,
-  createIbo,
-} from "./libs/webglUtils";
+import { createProgram, createVbo, createIbo } from "./libs/webglUtils";
 import { Icosahedron } from "./libs/geometry.js";
 import { WebGLOrbitCamera } from "./libs/camera.js";
 import { WebGLMath } from "./libs/math.js";
@@ -15,9 +10,9 @@ let sphereVao = [];
 let numOfTriangles = 0;
 let camera;
 let cameraOptions = {
-  distance: 2,
+  distance: 20,
   min: 1.0,
-  max: 3.0,
+  max: 30.0,
   move: 2.0,
 };
 const m4 = WebGLMath.Mat4;
@@ -37,16 +32,13 @@ const init = () => {
 };
 
 const initProgram = async (gl) => {
-  // const vs = await loadFile("/src/shaders/main.vert");
-  // const fs = await loadFile("/src/shaders/main.frag");
-
   const program = await createProgram(gl, vs, fs);
 
   return program;
 };
 
 const setUp = (gl, program) => {
-  const icosahedron = Icosahedron(4);
+  const icosahedron = Icosahedron(6, false, 10);
   numOfTriangles = icosahedron.index.length;
 
   const sphereVbos = [
@@ -72,6 +64,8 @@ const setUp = (gl, program) => {
   gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
 
   gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearDepth(1.0);
+  gl.enable(gl.DEPTH_TEST);
 
   camera = new WebGLOrbitCamera(gl.canvas, cameraOptions);
 };
@@ -86,7 +80,7 @@ const render = (gl, program) => {
   // Update mvp matrix
   const velocity = deltaTime * 0.2;
   const rotateAxis = v3.create(Math.cos(velocity), Math.sin(velocity), 0.5);
-  const rotateAngle = deltaTime * 0.3;
+  const rotateAngle = deltaTime * 0;
   const m = m4.rotate(m4.identity(), rotateAngle, rotateAxis);
   const v = camera.update();
   const fovy = 90;
@@ -97,7 +91,7 @@ const render = (gl, program) => {
   const vp = m4.multiply(p, v);
   const mvp = m4.multiply(vp, m);
 
-  gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   gl.useProgram(program);

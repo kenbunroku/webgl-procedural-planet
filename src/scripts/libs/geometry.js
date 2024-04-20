@@ -5,7 +5,6 @@ export const Icosahedron = (order = 0, uvMap = false, radius = 1) => {
 
   if (order > 10) throw new Error(`Max order is 10, but given ${order}.`);
 
-  // set up a 20-triangle icosahedron
   const f = (1 + Math.sqrt(5)) / 2;
   const T = Math.pow(4, order);
 
@@ -283,6 +282,5 @@ export const Icosahedron = (order = 0, uvMap = false, radius = 1) => {
     normal: normals,
     texCoord: uv,
     index: triangles,
-    // colors: colors,
   };
 };
