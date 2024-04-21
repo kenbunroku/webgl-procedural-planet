@@ -1,3 +1,5 @@
+import { Pane } from "tweakpane";
+
 import { createProgram, createVbo, createIbo } from "./libs/webglUtils";
 import { Icosahedron } from "./libs/geometry.js";
 import { WebGLOrbitCamera } from "./libs/camera.js";
@@ -15,6 +17,16 @@ let cameraOptions = {
   max: 30.0,
   move: 2.0,
 };
+let params = {
+  continentShapeFrequency: 0.2,
+  continentShapeStrength: 2.5,
+  oceanFloorDepth: 3.0,
+  oceanFloorSmoothing: 0.5,
+  oceanDepthMultiplier: 5.0,
+  mountainShapeFrequency: 0.2,
+  mountainShapeStrength: 5.0,
+  maskFrequency: 0.1,
+};
 const m4 = WebGLMath.Mat4;
 const v3 = WebGLMath.Vec3;
 
@@ -28,6 +40,49 @@ const init = () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 
+  const pane = new Pane();
+  pane.addBinding(params, "continentShapeFrequency", {
+    label: "Continent Shape Frequency",
+    min: 0.001,
+    max: 1.0,
+    step: 0.001,
+  });
+  pane.addBinding(params, "continentShapeStrength", {
+    label: "Continent Shape Strength",
+    min: 0.01,
+    max: 5.0,
+  });
+  pane.addBinding(params, "oceanFloorDepth", {
+    label: "Ocean Floor Depth",
+    min: 0.0,
+    max: 5.0,
+  });
+  pane.addBinding(params, "oceanFloorSmoothing", {
+    label: "Ocean Floor Smoothing",
+    min: 0.01,
+    max: 5.0,
+  });
+  pane.addBinding(params, "oceanDepthMultiplier", {
+    label: "Ocean Depth Multiplier",
+    min: 0.01,
+    max: 10.0,
+  });
+  pane.addBinding(params, "mountainShapeFrequency", {
+    label: "Mountain Shape Frequency",
+    min: 0.01,
+    max: 0.5,
+  });
+  pane.addBinding(params, "mountainShapeStrength", {
+    label: "Mountain Shape Strength",
+    min: 0.01,
+    max: 10.0,
+  });
+  pane.addBinding(params, "maskFrequency", {
+    label: "Mask Frequency",
+    min: 0.01,
+    max: 3.0,
+  });
+
   return gl;
 };
 
@@ -38,7 +93,7 @@ const initProgram = async (gl) => {
 };
 
 const setUp = (gl, program) => {
-  const icosahedron = Icosahedron(6, false, 10);
+  const icosahedron = Icosahedron(6, true, 10);
   numOfTriangles = icosahedron.index.length;
 
   const sphereVbos = [
@@ -46,14 +101,17 @@ const setUp = (gl, program) => {
     createVbo(gl, icosahedron.texCoord, gl.STATIC_DRAW),
     createVbo(gl, icosahedron.normal, gl.STATIC_DRAW),
   ];
+  const strides = [3, 2, 3];
+  const locations = ["position", "uv", "normal"];
 
   sphereVao = gl.createVertexArray();
   gl.bindVertexArray(sphereVao);
 
   sphereVbos.forEach((vbo, index) => {
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.enableVertexAttribArray(index);
-    gl.vertexAttribPointer(index, 3, gl.FLOAT, false, 0, 0);
+    const attributeLocation = gl.getAttribLocation(program, locations[index]);
+    gl.enableVertexAttribArray(attributeLocation);
+    gl.vertexAttribPointer(index, strides[index], gl.FLOAT, false, 0, 0);
   });
 
   const sphereIbo = createIbo(gl, icosahedron.index);
@@ -96,8 +154,44 @@ const render = (gl, program) => {
 
   gl.useProgram(program);
   gl.bindVertexArray(sphereVao);
+
+  // Uniforms
   gl.uniform1f(gl.getUniformLocation(program, "time"), deltaTime);
   gl.uniformMatrix4fv(gl.getUniformLocation(program, "mvpMatrix"), false, mvp);
+  gl.uniform1f(
+    gl.getUniformLocation(program, "continentShapeFrequency"),
+    params.continentShapeFrequency
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "continentShapeStrength"),
+    params.continentShapeStrength
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "oceanFloorDepth"),
+    params.oceanFloorDepth
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "oceanFloorSmoothing"),
+    params.oceanFloorSmoothing
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "oceanDepthMultiplier"),
+    params.oceanDepthMultiplier
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "mountainShapeFrequency"),
+    params.mountainShapeFrequency
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "mountainShapeStrength"),
+    params.mountainShapeStrength
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(program, "maskFrequency"),
+    params.maskFrequency
+  );
+
+  // drawing
   gl.drawElements(gl.TRIANGLES, numOfTriangles, gl.UNSIGNED_SHORT, 0);
 
   gl.bindVertexArray(null);
