@@ -12,6 +12,7 @@
   "dependencies": {
     "@astrojs/check": "^0.4.1",
     "astro": "^4.3.5",
+    "tweakpane": "^4.0.3",
     "typescript": "^5.3.3"
   },
   "devDependencies": {
