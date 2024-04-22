@@ -1,15 +1,25 @@
 import { Pane } from "tweakpane";
 
-import { createProgram, createVbo, createIbo } from "./libs/webglUtils";
-import { Icosahedron } from "./libs/geometry.js";
+import {
+  createProgram,
+  createVbo,
+  createIbo,
+  createFramebufferFloat2,
+} from "./libs/webglUtils";
+import { Icosahedron, Plane } from "./libs/geometry.js";
 import { WebGLOrbitCamera } from "./libs/camera.js";
 import { WebGLMath } from "./libs/math.js";
 import vs from "../shaders/main.vert";
 import fs from "../shaders/main.frag";
+import oceanVs from "../shaders/ocean.vert";
+import oceanFs from "../shaders/ocean.frag";
 
 let startTime = Date.now();
 let sphereVao = [];
+let oceanVao = [];
 let numOfTriangles = 0;
+let numOfOceanTriangles = 0;
+let sphereFbo;
 let camera;
 let cameraOptions = {
   distance: 20,
@@ -26,6 +36,11 @@ let params = {
   mountainShapeFrequency: 0.2,
   mountainShapeStrength: 7.0,
   maskFrequency: 0.1,
+  waterHight: 8.75,
+};
+let programs = {
+  sphere: null,
+  ocean: null,
 };
 const m4 = WebGLMath.Mat4;
 const v3 = WebGLMath.Vec3;
@@ -33,12 +48,16 @@ const v3 = WebGLMath.Vec3;
 const init = () => {
   const canvas = document.getElementById("webgl-canvas");
   const gl = canvas.getContext("webgl2");
+  gl.getExtension("EXT_color_buffer_float");
+  gl.getExtension("OES_texture_float_linear");
   if (!gl) {
     console.error("WebGL2.0 not supported");
     return;
   }
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+
+  camera = new WebGLOrbitCamera(gl.canvas, cameraOptions);
 
   const pane = new Pane();
   pane.addBinding(params, "continentShapeFrequency", {
@@ -82,17 +101,30 @@ const init = () => {
     min: 0.01,
     max: 1.0,
   });
+  pane.addBinding(params, "waterHight", {
+    label: "Water Hight",
+    min: 0.0,
+    max: 15.0,
+  });
 
   return gl;
 };
 
-const initProgram = async (gl) => {
+const initProgram = async (gl, vs, fs) => {
   const program = await createProgram(gl, vs, fs);
 
   return program;
 };
 
-const setUp = (gl, program) => {
+const setUp = (gl, programs) => {
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clearDepth(1.0);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  // Sphere
   const icosahedron = Icosahedron(6, true, 8);
   numOfTriangles = icosahedron.index.length;
 
@@ -109,27 +141,56 @@ const setUp = (gl, program) => {
 
   sphereVbos.forEach((vbo, index) => {
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    const attributeLocation = gl.getAttribLocation(program, locations[index]);
+    const attributeLocation = gl.getAttribLocation(
+      programs.sphere,
+      locations[index]
+    );
     gl.enableVertexAttribArray(attributeLocation);
     gl.vertexAttribPointer(index, strides[index], gl.FLOAT, false, 0, 0);
   });
 
   const sphereIbo = createIbo(gl, icosahedron.index);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, sphereIbo);
-  gl.bindVertexArray(null);
 
-  const resolutionLocation = gl.getUniformLocation(program, "resolution");
+  sphereFbo = createFramebufferFloat2(gl, gl.canvas.width, gl.canvas.height);
+
+  const resolutionLocation = gl.getUniformLocation(
+    programs.sphere,
+    "resolution"
+  );
   gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
 
-  gl.clearColor(0.0, 0.0, 0.0, 1.0);
-  gl.clearDepth(1.0);
-  gl.enable(gl.DEPTH_TEST);
+  // Ocean
+  const icosahedron2 = Icosahedron(4, true, params.waterHight);
+  numOfOceanTriangles = icosahedron2.index.length;
+  const oceanVbos = [
+    createVbo(gl, icosahedron2.position, gl.STATIC_DRAW),
+    createVbo(gl, icosahedron2.texCoord, gl.STATIC_DRAW),
+    createVbo(gl, icosahedron2.normal, gl.STATIC_DRAW),
+  ];
+  const planeStrides = [3, 2, 3];
+  const planeLocations = ["position", "uv", "normal"];
 
-  camera = new WebGLOrbitCamera(gl.canvas, cameraOptions);
+  oceanVao = gl.createVertexArray();
+  gl.bindVertexArray(oceanVao);
+
+  oceanVbos.forEach((vbo, index) => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+    const attributeLocation = gl.getAttribLocation(
+      programs.ocean,
+      planeLocations[index]
+    );
+    gl.enableVertexAttribArray(attributeLocation);
+    gl.vertexAttribPointer(index, planeStrides[index], gl.FLOAT, false, 0, 0);
+  });
+
+  const oceanIbo = createIbo(gl, icosahedron2.index);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, oceanIbo);
+  gl.bindVertexArray(null);
 };
 
-const render = (gl, program) => {
-  requestAnimationFrame(() => render(gl, program));
+const render = (gl, programs) => {
+  requestAnimationFrame(() => render(gl, programs));
 
   // delta time
   const currentTime = Date.now();
@@ -149,59 +210,79 @@ const render = (gl, program) => {
   const vp = m4.multiply(p, v);
   const mvp = m4.multiply(vp, m);
 
+  // gl.bindFramebuffer(gl.FRAMEBUFFER, sphereFbo.framebuffer);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-  gl.useProgram(program);
+  gl.useProgram(programs.sphere);
   gl.bindVertexArray(sphereVao);
 
   // Uniforms
-  gl.uniform1f(gl.getUniformLocation(program, "time"), deltaTime);
-  gl.uniformMatrix4fv(gl.getUniformLocation(program, "mvpMatrix"), false, mvp);
+  gl.uniform1f(gl.getUniformLocation(programs.sphere, "time"), deltaTime);
+  gl.uniformMatrix4fv(
+    gl.getUniformLocation(programs.sphere, "mvpMatrix"),
+    false,
+    mvp
+  );
   gl.uniform1f(
-    gl.getUniformLocation(program, "continentShapeFrequency"),
+    gl.getUniformLocation(programs.sphere, "continentShapeFrequency"),
     params.continentShapeFrequency
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "continentShapeStrength"),
+    gl.getUniformLocation(programs.sphere, "continentShapeStrength"),
     params.continentShapeStrength
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "oceanFloorDepth"),
+    gl.getUniformLocation(programs.sphere, "oceanFloorDepth"),
     params.oceanFloorDepth
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "oceanFloorSmoothing"),
+    gl.getUniformLocation(programs.sphere, "oceanFloorSmoothing"),
     params.oceanFloorSmoothing
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "oceanDepthMultiplier"),
+    gl.getUniformLocation(programs.sphere, "oceanDepthMultiplier"),
     params.oceanDepthMultiplier
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "mountainShapeFrequency"),
+    gl.getUniformLocation(programs.sphere, "mountainShapeFrequency"),
     params.mountainShapeFrequency
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "mountainShapeStrength"),
+    gl.getUniformLocation(programs.sphere, "mountainShapeStrength"),
     params.mountainShapeStrength
   );
   gl.uniform1f(
-    gl.getUniformLocation(program, "maskFrequency"),
+    gl.getUniformLocation(programs.sphere, "maskFrequency"),
     params.maskFrequency
   );
 
   // drawing
   gl.drawElements(gl.TRIANGLES, numOfTriangles, gl.UNSIGNED_SHORT, 0);
 
+  // Ocean
+  gl.useProgram(programs.ocean);
+  gl.bindVertexArray(oceanVao);
+  gl.uniformMatrix4fv(
+    gl.getUniformLocation(programs.ocean, "mvpMatrix"),
+    false,
+    mvp
+  );
+  gl.uniform1f(
+    gl.getUniformLocation(programs.ocean, "waterHight"),
+    params.waterHight
+  );
+  gl.drawElements(gl.TRIANGLES, numOfOceanTriangles, gl.UNSIGNED_SHORT, 0);
+
   gl.bindVertexArray(null);
 };
 
 const run = async () => {
   const gl = init();
-  const program = await initProgram(gl);
-  setUp(gl, program);
-  render(gl, program);
+  programs.sphere = await initProgram(gl, vs, fs);
+  programs.ocean = await initProgram(gl, oceanVs, oceanFs);
+  setUp(gl, programs);
+  render(gl, programs);
 };
 
 const resize = (gl) => {
