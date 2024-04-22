@@ -284,3 +284,11 @@ export const Icosahedron = (order = 0, uvMap = false, radius = 1) => {
     index: triangles,
   };
 };
+
+export const Plane = () => {
+  const pos = [-1.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 1.0, 0.0, -1.0, 1.0, 0.0];
+  const nor = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0];
+  const st = [0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0];
+  const idx = [0, 1, 2, 0, 2, 3];
+  return { position: pos, normal: nor, texCoord: st, index: idx };
+};
