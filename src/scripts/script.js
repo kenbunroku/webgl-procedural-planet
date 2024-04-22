@@ -22,9 +22,9 @@ let params = {
   continentShapeStrength: 2.5,
   oceanFloorDepth: 3.0,
   oceanFloorSmoothing: 0.5,
-  oceanDepthMultiplier: 5.0,
+  oceanDepthMultiplier: 15.0,
   mountainShapeFrequency: 0.2,
-  mountainShapeStrength: 5.0,
+  mountainShapeStrength: 7.0,
   maskFrequency: 0.1,
 };
 const m4 = WebGLMath.Mat4;
@@ -65,7 +65,7 @@ const init = () => {
   pane.addBinding(params, "oceanDepthMultiplier", {
     label: "Ocean Depth Multiplier",
     min: 0.01,
-    max: 10.0,
+    max: 25.0,
   });
   pane.addBinding(params, "mountainShapeFrequency", {
     label: "Mountain Shape Frequency",
@@ -80,7 +80,7 @@ const init = () => {
   pane.addBinding(params, "maskFrequency", {
     label: "Mask Frequency",
     min: 0.01,
-    max: 3.0,
+    max: 1.0,
   });
 
   return gl;
@@ -93,7 +93,7 @@ const initProgram = async (gl) => {
 };
 
 const setUp = (gl, program) => {
-  const icosahedron = Icosahedron(6, true, 10);
+  const icosahedron = Icosahedron(6, true, 8);
   numOfTriangles = icosahedron.index.length;
 
   const sphereVbos = [
