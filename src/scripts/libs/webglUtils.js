@@ -75,3 +75,45 @@ export const createIbo = (gl, data) => {
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
   return ibo;
 };
+
+export const createFramebufferFloat2 = (gl, width, height) => {
+  const depthRenderBuffer = gl.createRenderbuffer();
+  gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderBuffer);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+  const frameBuffer = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, frameBuffer);
+  const fTexture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, fTexture);
+  // RGBA32F かつ FLOAT
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA32F,
+    width,
+    height,
+    0,
+    gl.RGBA,
+    gl.FLOAT,
+    null
+  );
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.framebufferTexture2D(
+    gl.FRAMEBUFFER,
+    gl.COLOR_ATTACHMENT0,
+    gl.TEXTURE_2D,
+    fTexture,
+    0
+  );
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return {
+    framebuffer: frameBuffer,
+    renderbuffer: depthRenderBuffer,
+    texture: fTexture,
+    width: width,
+    height: height,
+  };
+};
