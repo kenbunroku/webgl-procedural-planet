@@ -80,17 +80,28 @@ float ridgedFBM(vec3 p, int octaves, float persistence, float lacunarity) {
   return total;
 }
 
+float smoothedRidgedNoise(vec3 pos, int octaves, float persistence, float lacunarity) {
+  vec3 sphereNormal = normalize(pos);
+  vec3 axisA = cross(sphereNormal, vec3(0.0f, 1.0f, 0.0f));
+  vec3 axisB = cross(sphereNormal, axisA);
+
+  float offsetDst = 0.5f * 0.01f;
+  float sample0 = ridgedFBM(pos, octaves, persistence, lacunarity);
+  float sample1 = ridgedFBM(pos - axisA * offsetDst, octaves, persistence, lacunarity);
+  float sample2 = ridgedFBM(pos + axisA * offsetDst, octaves, persistence, lacunarity);
+  float sample3 = ridgedFBM(pos - axisB * offsetDst, octaves, persistence, lacunarity);
+  float sample4 = ridgedFBM(pos + axisB * offsetDst, octaves, persistence, lacunarity);
+  return (sample0 + sample1 + sample2 + sample3 + sample4) / 5.0f;
+}
+
 vec3 distorted(vec3 pos, vec3 normal) {
   float continentShape = fbm(pos * continentShapeFrequency + offset, 1, 0.5f, 2.0f);
-  // continentShape = abs(continentShape);
-  continentShape *= continentShapeStrength;
-  continentShape += fbm(pos * continentShapeFrequency + offset, 8, 0.5f, 2.0f);
 
   float oceanFloorShape = -oceanFloorDepth + continentShape * 0.15f;
   continentShape = smoothMax(continentShape, oceanFloorShape, oceanFloorSmoothing);
   continentShape *= (continentShape < 0.f) ? 1.f + oceanDepthMultiplier : 1.f;
 
-  float mountainShape = ridgedFBM(pos * mountainShapeFrequency, 1, 0.5f, 2.0f);
+  float mountainShape = smoothedRidgedNoise(pos * mountainShapeFrequency, 6, 0.5f, 2.0f);
   mountainShape *= mountainShapeStrength;
 
   float mask = Blend(0.0f, 1.2f, fbm(pos * maskFrequency + offset, 1, 0.5f, 2.0f));
@@ -98,8 +109,9 @@ vec3 distorted(vec3 pos, vec3 normal) {
   float finalHeight = 1.f + (continentShape + mountainShape * mask) * .15f;
 
   pos += normal * finalHeight;
-  pos = rotateVec3(pos, time * 0.1f, AIXS_Y);
-  // pos = rotateVec3(pos, time * 0.4f, AIXS_X);
+
+  pos = rotateVec3(pos, time * 0.05f, AIXS_Y);
+  pos = rotateVec3(pos, time * 0.05f, AIXS_Z);
   return pos;
 }
 
